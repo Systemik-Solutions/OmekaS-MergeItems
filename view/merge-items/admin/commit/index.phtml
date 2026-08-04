@@ -1,0 +1,196 @@
+<?php
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$commitForm->prepare();
+$csrfName = $commitForm->getName() . '_csrf';
+$commitUrl = $this->url('admin/merge-items-commit');
+$browseUrl = $this->url(
+    'admin/default',
+    ['controller' => 'item', 'action' => 'browse'],
+    ['query' => $returnQuery]
+);
+$queryJson = json_encode($returnQuery);
+$masterTemplate = $master->resourceTemplate();
+$masterMedia = $master->media();
+$this->htmlElement('body')->appendAttribute('class', 'merge-items merge-items-commit items');
+?>
+
+<?= $this->pageTitle($translate('Confirm item merge')) ?>
+
+<link rel="stylesheet" href="<?= $this->escapeHtmlAttr($this->assetUrl('css/merge-items.css', 'MergeItems')) ?>">
+
+<div id="page-actions">
+    <a class="button" href="<?= $this->escapeHtmlAttr($browseUrl) ?>">
+        <?= $translate('Cancel') ?>
+    </a>
+</div>
+
+<main class="merge-items-page merge-items-commit-page">
+    <p class="merge-items-help">
+        <?= $translate('Select the fields you want to add to the master record. References from other items will be redirected to the master. Committing these changes will permanently delete the other items.') ?>
+    </p>
+
+    <section class="merge-items-master-summary" aria-labelledby="merge-items-master-heading">
+        <p class="merge-items-master-badge"><?= $translate('Master record') ?></p>
+        <div class="merge-items-record-header">
+            <h2 class="merge-items-record-title" id="merge-items-master-heading">
+                <?= $master->link($master->displayTitle(), null, ['target' => '_blank']) ?>
+            </h2>
+            <span class="merge-items-template">
+                <strong><?= $escape($masterTemplate ? $masterTemplate->label() : $translate('None')) ?></strong>
+            </span>
+        </div>
+
+        <?= $this->partial('merge-items/admin/common/references', [
+            'references' => $incomingReferences[$master->id()] ?? [],
+        ]) ?>
+
+        <?php if ($masterMedia): ?>
+        <div class="merge-items-media-list merge-items-master-media">
+            <?php foreach ($masterMedia as $media): ?>
+            <a href="<?= $this->escapeHtmlAttr($media->adminUrl()) ?>" target="_blank" class="merge-items-media-card">
+                <img
+                    src="<?= $this->escapeHtmlAttr($media->thumbnailUrl('square')) ?>"
+                    alt="<?= $this->escapeHtmlAttr($media->displayTitle()) ?>"
+                >
+                <span><?= $escape($media->displayTitle()) ?></span>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <div class="merge-items-master-values">
+            <?php $masterValues = $master->values(); ?>
+            <?php if ($masterValues): ?>
+                <?= $this->partial('common/resource-values.phtml', ['values' => $masterValues]) ?>
+            <?php else: ?>
+                <p><?= $translate('The master record has no metadata values.') ?></p>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <form method="post" action="<?= $this->escapeHtmlAttr($commitUrl) ?>" class="disable-unsaved-warning">
+        <?= $this->formElement($commitForm->get($csrfName)) ?>
+        <?php foreach ($resourceIds as $resourceId): ?>
+        <input type="hidden" name="resource_ids[]" value="<?= $resourceId ?>">
+        <?php endforeach; ?>
+        <input type="hidden" name="master_id" value="<?= $master->id() ?>">
+        <input type="hidden" name="query" value="<?= $this->escapeHtmlAttr($queryJson ?: '{}') ?>">
+
+        <section class="merge-items-carousel merge-items-commit-carousel" aria-label="<?= $this->escapeHtmlAttr($translate('Items to be merged')) ?>">
+            <div class="merge-items-carousel-toolbar">
+                <p class="merge-items-count">
+                    <?= sprintf($translate('%s items will be deleted after merging'), count($duplicates)) ?>
+                </p>
+                <p class="merge-items-scroll-help" id="merge-items-commit-scroll-help">
+                    <?= $translate('Drag or scroll horizontally to compare items.') ?>
+                </p>
+            </div>
+
+            <div class="merge-items-viewport">
+                <div
+                    class="merge-items-track"
+                    data-merge-viewport
+                    tabindex="0"
+                    aria-describedby="merge-items-commit-scroll-help"
+                >
+                    <?php foreach ($duplicates as $duplicateId => $duplicate): ?>
+                    <?php
+                    $duplicateTemplate = $duplicate->resourceTemplate();
+                    $duplicateMedia = $duplicate->media();
+                    $properties = $mergeableValues[$duplicateId] ?? [];
+                    $mediaChecked = isset($selectedMedia[$duplicateId]);
+                    ?>
+                    <article class="merge-items-slide merge-items-commit-slide">
+                        <div class="merge-items-record-header">
+                            <h2 class="merge-items-record-title">
+                                <?= $duplicate->link($duplicate->displayTitle(), null, ['target' => '_blank']) ?>
+                            </h2>
+                            <span class="merge-items-template">
+                                <strong><?= $escape($duplicateTemplate ? $duplicateTemplate->label() : $translate('None')) ?></strong>
+                            </span>
+                        </div>
+
+                        <?= $this->partial('merge-items/admin/common/references', [
+                            'references' => $incomingReferences[$duplicateId] ?? [],
+                        ]) ?>
+
+                        <?php if ($duplicateMedia): ?>
+                        <section class="merge-items-selectable-group merge-items-media-group">
+                            <label class="merge-items-field-option">
+                                <input
+                                    type="checkbox"
+                                    name="merge_media[<?= $duplicateId ?>]"
+                                    value="1"
+                                    <?= $mediaChecked ? 'checked' : '' ?>
+                                >
+                                <strong><?= sprintf($translate('Media (%s)'), count($duplicateMedia)) ?></strong>
+                            </label>
+                            <div class="merge-items-media-list">
+                                <?php foreach ($duplicateMedia as $media): ?>
+                                <a href="<?= $this->escapeHtmlAttr($media->adminUrl()) ?>" target="_blank" class="merge-items-media-card">
+                                    <img
+                                        src="<?= $this->escapeHtmlAttr($media->thumbnailUrl('square')) ?>"
+                                        alt="<?= $this->escapeHtmlAttr($media->displayTitle()) ?>"
+                                    >
+                                    <span><?= $escape($media->displayTitle()) ?></span>
+                                </a>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                        <?php endif; ?>
+
+                        <div class="merge-items-selectable-values">
+                            <?php if ($properties): ?>
+                                <?php foreach ($properties as $propertyId => $propertyData): ?>
+                                <?php
+                                $property = $propertyData['property'];
+                                $propertyLabel = $propertyData['alternate_label'] ?: $translate($property->label());
+                                $propertyChecked = in_array($propertyId, $selectedValues[$duplicateId] ?? [], true);
+                                ?>
+                                <section class="merge-items-selectable-group">
+                                    <label class="merge-items-field-option">
+                                        <input
+                                            type="checkbox"
+                                            name="merge_values[<?= $duplicateId ?>][<?= $propertyId ?>]"
+                                            value="1"
+                                            <?= $propertyChecked ? 'checked' : '' ?>
+                                        >
+                                        <strong><?= $escape($propertyLabel) ?></strong>
+                                    </label>
+                                    <div class="merge-items-field-values">
+                                        <?php foreach ($propertyData['values'] as $value): ?>
+                                        <div class="merge-items-field-value">
+                                            <?= $value->asHtml() ?>
+                                            <?php if (!$value->isPublic()): ?>
+                                            <span class="o-icon-private" role="img" title="<?= $this->escapeHtmlAttr($translate('Private')) ?>" aria-label="<?= $this->escapeHtmlAttr($translate('Private')) ?>"></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </section>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="merge-items-no-fields">
+                                    <?= $translate('This item has no fields that also exist in the master record.') ?>
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </section>
+
+        <div class="merge-items-submit">
+            <input
+                type="submit"
+                name="commit_changes"
+                value="<?= $this->escapeHtmlAttr($translate('Commit changes')) ?>"
+                class="red button"
+            >
+        </div>
+    </form>
+</main>
+
+<script src="<?= $this->escapeHtmlAttr($this->assetUrl('js/merge-items-carousel.js', 'MergeItems')) ?>"></script>

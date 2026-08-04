@@ -1,0 +1,121 @@
+<?php
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$this->htmlElement('body')->appendAttribute('class', 'merge-items items');
+$browseUrl = $this->url(
+    'admin/default',
+    ['controller' => 'item', 'action' => 'browse'],
+    ['query' => $returnQuery]
+);
+$mergeUrl = $this->url('admin/merge-items-commit');
+$queryJson = json_encode($returnQuery);
+$itemCount = count($items);
+?>
+
+<?= $this->pageTitle($translate('Merge selected items')) ?>
+
+<link rel="stylesheet" href="<?= $this->escapeHtmlAttr($this->assetUrl('css/merge-items.css', 'MergeItems')) ?>">
+
+<div id="page-actions">
+    <a class="button" href="<?= $this->escapeHtmlAttr($browseUrl) ?>">
+        <?= $translate('Cancel') ?>
+    </a>
+</div>
+
+<main class="merge-items-page">
+    <p class="merge-items-help">
+        <?= $translate('Use this page to combine duplicate records. Select one item as the master record.') ?>
+    </p>
+
+    <form method="post" action="<?= $this->escapeHtmlAttr($mergeUrl) ?>" class="disable-unsaved-warning">
+        <?php foreach ($items as $item): ?>
+        <input type="hidden" name="resource_ids[]" value="<?= $item->id() ?>">
+        <?php endforeach; ?>
+        <input type="hidden" name="query" value="<?= $this->escapeHtmlAttr($queryJson ?: '{}') ?>">
+
+        <section
+            class="merge-items-carousel"
+            data-merge-carousel
+            aria-label="<?= $this->escapeHtmlAttr($translate('Selected items')) ?>"
+        >
+            <div class="merge-items-carousel-toolbar">
+                <p class="merge-items-count">
+                    <?= sprintf($translate('%s selected items'), $itemCount) ?>
+                </p>
+                <p class="merge-items-scroll-help" id="merge-items-scroll-help">
+                    <?= $translate('Drag or scroll horizontally to compare items.') ?>
+                </p>
+            </div>
+
+            <div class="merge-items-viewport">
+                <div
+                    class="merge-items-track"
+                    data-merge-track
+                    data-merge-viewport
+                    tabindex="0"
+                    aria-describedby="merge-items-scroll-help"
+                >
+                    <?php foreach ($items as $index => $item): ?>
+                    <?php
+                    $resourceTemplate = $item->resourceTemplate();
+                    $isMaster = $masterId === $item->id();
+                    ?>
+                    <article
+                        class="merge-items-slide<?= $isMaster ? ' is-master' : '' ?>"
+                        data-merge-slide
+                        aria-label="<?= $this->escapeHtmlAttr(sprintf($translate('Item %1$s of %2$s'), $index + 1, $itemCount)) ?>"
+                    >
+                        <label class="merge-items-master-option">
+                            <input
+                                type="radio"
+                                name="master_id"
+                                value="<?= $item->id() ?>"
+                                required
+                                <?= $isMaster ? 'checked' : '' ?>
+                            >
+                            <span><?= $translate('Master record') ?></span>
+                        </label>
+
+                        <div class="merge-items-record-header">
+                            <h2 class="merge-items-record-title">
+                                <?= $item->link($item->displayTitle(), null, ['target' => '_blank']) ?>
+                            </h2>
+
+                            <span class="merge-items-template">
+                                <strong><?= $escape($resourceTemplate ? $resourceTemplate->label() : $translate('None')) ?></strong>
+                            </span>
+                        </div>
+
+                        <?= $this->partial('merge-items/admin/common/references', [
+                            'references' => $incomingReferences[$item->id()] ?? [],
+                        ]) ?>
+
+                        <div class="merge-items-record-values">
+                            <?php $values = $item->values(); ?>
+                            <?php if ($values): ?>
+                                <?= $this->partial('common/resource-values.phtml', ['values' => $values]) ?>
+                            <?php else: ?>
+                                <p><?= $translate('This item has no metadata values.') ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </section>
+
+        <div class="merge-items-submit">
+            <input
+                type="submit"
+                name="merge_items"
+                value="<?= $this->escapeHtmlAttr($translate('Merge items')) ?>"
+                class="green button"
+                data-merge-submit
+            >
+        </div>
+    </form>
+</main>
+
+<script
+    src="<?= $this->escapeHtmlAttr($this->assetUrl('js/merge-items-carousel.js', 'MergeItems')) ?>"
+></script>

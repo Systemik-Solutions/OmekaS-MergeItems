@@ -1,0 +1,28 @@
+<?php
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+?>
+
+<section class="merge-items-references" aria-label="<?= $this->escapeHtmlAttr($translate('References')) ?>">
+    <h3><?= $translate('References') ?></h3>
+    <?php if ($references): ?>
+    <ul>
+        <?php foreach ($references as $reference): ?>
+        <li>
+            <?= $reference['item']->link(
+                $reference['item']->displayTitle(),
+                null,
+                ['target' => '_blank']
+            ) ?>
+            <?php if ($reference['properties']): ?>
+            <span class="merge-items-reference-properties">
+                <?= $escape(implode(', ', $reference['properties'])) ?>
+            </span>
+            <?php endif; ?>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+    <?php else: ?>
+    <p><?= $translate('No other items reference this item.') ?></p>
+    <?php endif; ?>
+</section>
