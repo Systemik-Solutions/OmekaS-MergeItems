@@ -7,6 +7,29 @@ duplicates.
 
 - Omeka S 4.x, version 4.1.1 or later
 
+## Installation
+
+The module directory must be named exactly `MergeItems`.
+
+### Download
+
+1. Download the module from the [GitHub repository](https://github.com/Systemik-Solutions/OmekaS-MergeItems).
+2. Extract the downloaded archive into the `modules` directory of your Omeka S installation.
+3. Rename the extracted directory to `MergeItems`.
+
+
+### Git
+
+Alternatively, clone the repository directly into the correctly named directory:
+
+```sh
+cd /path/to/omeka-s/modules
+git clone https://github.com/Systemik-Solutions/OmekaS-MergeItems.git MergeItems
+```
+
+After installing the files, sign in to the Omeka S admin interface, open
+**Modules**, and click **Install** for **Merge Items**.
+
 ## Workflow
 
 1. Open the Items browse page at `/admin/item` and select at least two items.
