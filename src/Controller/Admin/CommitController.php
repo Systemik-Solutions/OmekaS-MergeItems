@@ -256,15 +256,17 @@ class CommitController extends AbstractActionController
         );
         $affectedSources = [];
         foreach ($rewirePlan['affected_source_ids'] as $sourceId) {
-            /** @var ItemRepresentation $source */
-            $source = $this->apiManager->read('items', $sourceId)->getContent();
+            $source = $this->apiManager->read('resources', $sourceId)->getContent();
             if (!$source->userIsAllowed('update')) {
                 throw new \RuntimeException(sprintf(
-                    'The current user cannot update referencing item %d.',
+                    'The current user cannot update referencing resource %d.',
                     $sourceId
                 ));
             }
-            $affectedSources[$sourceId] = $source->isPublic();
+            $affectedSources[$sourceId] = [
+                'resource_name' => $source->resourceName(),
+                'is_public' => $source->isPublic(),
+            ];
         }
 
         foreach ($rewirePlan['annotation_ids'] as $annotationId) {
@@ -309,10 +311,10 @@ class CommitController extends AbstractActionController
             ]);
 
             // A lightweight partial update refreshes the full-text index and
-            // modified date of each item whose incoming reference was rewired.
-            foreach ($affectedSources as $sourceId => $isPublic) {
-                $this->apiManager->update('items', $sourceId, [
-                    'o:is_public' => $isPublic,
+            // modified date of every resource whose reference was rewired.
+            foreach ($affectedSources as $sourceId => $sourceData) {
+                $this->apiManager->update($sourceData['resource_name'], $sourceId, [
+                    'o:is_public' => $sourceData['is_public'],
                 ], [], [
                     'isPartial' => true,
                     'collectionAction' => 'append',

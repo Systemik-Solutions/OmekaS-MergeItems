@@ -20,7 +20,7 @@ class ReferenceManager
     public function findDisplayReferences(array $targetIds): array
     {
         $references = array_fill_keys($targetIds, []);
-        $rows = $this->getIncomingItemReferenceRows($targetIds);
+        $rows = $this->getIncomingReferenceRows($targetIds);
         $sourceIds = [];
         foreach ($rows as $row) {
             $sourceId = (int) $row['source_id'];
@@ -29,15 +29,15 @@ class ReferenceManager
             }
         }
 
-        $sourceItems = [];
+        $sourceResources = [];
         if ($sourceIds) {
             try {
-                $items = $this->apiManager->search('items', [
+                $resources = $this->apiManager->search('resources', [
                     'id' => array_keys($sourceIds),
                     'limit' => count($sourceIds),
                 ])->getContent();
-                foreach ($items as $item) {
-                    $sourceItems[$item->id()] = $item;
+                foreach ($resources as $resource) {
+                    $sourceResources[$resource->id()] = $resource;
                 }
             } catch (Throwable $e) {
                 // If the batch cannot be read, render no inaccessible sources.
@@ -50,13 +50,13 @@ class ReferenceManager
             if ($sourceId === $targetId) {
                 continue;
             }
-            if (!isset($sourceItems[$sourceId])) {
+            if (!isset($sourceResources[$sourceId])) {
                 continue;
             }
 
             if (!isset($references[$targetId][$sourceId])) {
                 $references[$targetId][$sourceId] = [
-                    'item' => $sourceItems[$sourceId],
+                    'resource' => $sourceResources[$sourceId],
                     'properties' => [],
                 ];
             }
@@ -80,7 +80,7 @@ class ReferenceManager
         // Include the master so pre-existing master-to-master references are
         // removed as part of the same self-reference protection.
         $targetIds = array_merge([$masterId], $duplicateIds);
-        foreach ($this->getIncomingItemReferenceRows($targetIds) as $row) {
+        foreach ($this->getIncomingReferenceRows($targetIds) as $row) {
             $sourceId = (int) $row['source_id'];
             $targetId = (int) $row['target_id'];
             if (isset($duplicateLookup[$sourceId])) {
@@ -127,7 +127,7 @@ class ReferenceManager
         }
     }
 
-    private function getIncomingItemReferenceRows(array $targetIds): array
+    private function getIncomingReferenceRows(array $targetIds): array
     {
         $targetIds = array_values(array_unique(array_filter(
             array_map('intval', $targetIds),
@@ -146,7 +146,6 @@ class ReferenceManager
                     v.property_id,
                     p.label AS property_label
              FROM `value` v
-             INNER JOIN item source_item ON source_item.id = v.resource_id
              INNER JOIN property p ON p.id = v.property_id
              WHERE v.value_resource_id IN (%s)
              ORDER BY v.value_resource_id, v.resource_id, v.property_id, v.id',

@@ -1,6 +1,12 @@
 <?php
 $translate = $this->plugin('translate');
 $escape = $this->plugin('escapeHtml');
+$resourceTypeLabels = [
+    'items' => $translate('Item'),
+    'item_sets' => $translate('Item set'),
+    'media' => $translate('Media'),
+    'value_annotations' => $translate('Value annotation'),
+];
 ?>
 
 <section class="merge-items-references" aria-label="<?= $this->escapeHtmlAttr($translate('References')) ?>">
@@ -8,12 +14,27 @@ $escape = $this->plugin('escapeHtml');
     <?php if ($references): ?>
     <ul>
         <?php foreach ($references as $reference): ?>
+        <?php
+        $resource = $reference['resource'];
+        $resourceName = $resource->resourceName();
+        $resourceTypeLabel = $resourceTypeLabels[$resourceName]
+            ?? ucwords(str_replace('_', ' ', $resourceName));
+        ?>
         <li>
-            <?= $reference['item']->link(
-                $reference['item']->displayTitle(),
-                null,
-                ['target' => '_blank']
-            ) ?>
+            <?php if ($resource->getControllerName()): ?>
+                <?= $resource->link(
+                    $resource->displayTitle(),
+                    null,
+                    ['target' => '_blank']
+                ) ?>
+            <?php else: ?>
+                <?= $escape($resource->displayTitle()) ?>
+            <?php endif; ?>
+            <?php if ($resourceName !== 'items'): ?>
+                <span class="merge-items-reference-type">
+                    <?= $escape(sprintf($translate('(%s)'), $resourceTypeLabel)) ?>
+                </span>
+            <?php endif; ?>
             <?php if ($reference['properties']): ?>
             <span class="merge-items-reference-properties">
                 <?= $escape(implode(', ', $reference['properties'])) ?>
@@ -23,6 +44,6 @@ $escape = $this->plugin('escapeHtml');
         <?php endforeach; ?>
     </ul>
     <?php else: ?>
-    <p><?= $translate('No other items reference this item.') ?></p>
+    <p><?= $translate('No other resources reference this item.') ?></p>
     <?php endif; ?>
 </section>

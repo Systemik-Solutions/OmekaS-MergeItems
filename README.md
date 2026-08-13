@@ -50,8 +50,10 @@ After installing the files, sign in to the Omeka S admin interface, open
 - Selecting a media group moves all media from that duplicate to the master.
 - The master record keeps its resource template, resource class, visibility,
   item sets, site assignments, and other item-level settings.
-- References from surviving items to a duplicate are changed to point to the
-  master record before the duplicate is deleted.
+- References from any surviving resource—including items, item sets, media,
+  and value annotations—to a duplicate are changed to point to the master
+  record before the duplicate is deleted. These referrers are listed in the
+  References panel before the merge.
 - Every non-master item is permanently deleted when the merge is committed.
 - Media that is not selected is deleted along with its duplicate item.
 
