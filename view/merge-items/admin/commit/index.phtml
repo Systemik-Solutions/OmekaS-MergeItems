@@ -49,10 +49,9 @@ $this->htmlElement('body')->appendAttribute('class', 'merge-items merge-items-co
         <div class="merge-items-media-list merge-items-master-media">
             <?php foreach ($masterMedia as $media): ?>
             <a href="<?= $this->escapeHtmlAttr($media->adminUrl()) ?>" target="_blank" class="merge-items-media-card">
-                <img
-                    src="<?= $this->escapeHtmlAttr($media->thumbnailUrl('square')) ?>"
-                    alt="<?= $this->escapeHtmlAttr($media->displayTitle()) ?>"
-                >
+                <?= $this->thumbnail($media, 'square', [
+                    'alt' => $media->displayTitle(),
+                ]) ?>
                 <span><?= $escape($media->displayTitle()) ?></span>
             </a>
             <?php endforeach; ?>
@@ -129,10 +128,9 @@ $this->htmlElement('body')->appendAttribute('class', 'merge-items merge-items-co
                             <div class="merge-items-media-list">
                                 <?php foreach ($duplicateMedia as $media): ?>
                                 <a href="<?= $this->escapeHtmlAttr($media->adminUrl()) ?>" target="_blank" class="merge-items-media-card">
-                                    <img
-                                        src="<?= $this->escapeHtmlAttr($media->thumbnailUrl('square')) ?>"
-                                        alt="<?= $this->escapeHtmlAttr($media->displayTitle()) ?>"
-                                    >
+                                    <?= $this->thumbnail($media, 'square', [
+                                        'alt' => $media->displayTitle(),
+                                    ]) ?>
                                     <span><?= $escape($media->displayTitle()) ?></span>
                                 </a>
                                 <?php endforeach; ?>
