@@ -157,6 +157,22 @@
     font-size: 13px;
 }
 
+.merge-items-references .merge-items-reference-warning,
+.merge-items-reference-permission-warning {
+    color: #a91919;
+    font-style: normal;
+}
+
+.merge-items-reference-permission-warning {
+    display: block;
+    font-size: 13px;
+}
+
+.merge-items-references ul + .merge-items-reference-warning,
+.merge-items-reference-warning + .merge-items-reference-warning {
+    margin-top: 8px;
+}
+
 .merge-items-record-values dl {
     margin: 0;
 }

@@ -12,7 +12,8 @@ class ReferenceManagerFactory implements FactoryInterface
     {
         return new ReferenceManager(
             $services->get('Omeka\EntityManager'),
-            $services->get('Omeka\ApiManager')
+            $services->get('Omeka\ApiManager'),
+            $services->get('Omeka\Logger')
         );
     }
 }

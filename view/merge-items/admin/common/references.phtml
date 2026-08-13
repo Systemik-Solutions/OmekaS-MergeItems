@@ -7,10 +7,19 @@ $resourceTypeLabels = [
     'media' => $translate('Media'),
     'value_annotations' => $translate('Value annotation'),
 ];
+$references = $referenceReport['resources'] ?? [];
+$unreadableCount = (int) ($referenceReport['unreadable_count'] ?? 0);
+$nonUpdatableCount = (int) ($referenceReport['non_updatable_count'] ?? 0);
+$loadError = !empty($referenceReport['load_error']);
 ?>
 
 <section class="merge-items-references" aria-label="<?= $this->escapeHtmlAttr($translate('References')) ?>">
     <h3><?= $translate('References') ?></h3>
+    <?php if ($loadError): ?>
+    <p class="merge-items-reference-warning">
+        <?= $translate('References could not be loaded. The merge cannot be safely completed until this problem is resolved.') ?>
+    </p>
+    <?php else: ?>
     <?php if ($references): ?>
     <ul>
         <?php foreach ($references as $reference): ?>
@@ -40,10 +49,32 @@ $resourceTypeLabels = [
                 <?= $escape(implode(', ', $reference['properties'])) ?>
             </span>
             <?php endif; ?>
+            <?php if (!$reference['can_update']): ?>
+            <span class="merge-items-reference-permission-warning">
+                <?= $translate('You do not have permission to update this resource.') ?>
+            </span>
+            <?php endif; ?>
         </li>
         <?php endforeach; ?>
     </ul>
-    <?php else: ?>
+    <?php elseif (!$unreadableCount): ?>
     <p><?= $translate('No other resources reference this item.') ?></p>
+    <?php endif; ?>
+    <?php if ($unreadableCount): ?>
+    <p class="merge-items-reference-warning">
+        <?= sprintf(
+            $translate('%s additional referencing resources cannot be viewed. The merge cannot proceed unless every referencing resource can be updated.'),
+            $unreadableCount
+        ) ?>
+    </p>
+    <?php endif; ?>
+    <?php if ($nonUpdatableCount): ?>
+    <p class="merge-items-reference-warning">
+        <?= sprintf(
+            $translate('%s visible referencing resources cannot be updated with your current permissions. The merge will not proceed.'),
+            $nonUpdatableCount
+        ) ?>
+    </p>
+    <?php endif; ?>
     <?php endif; ?>
 </section>

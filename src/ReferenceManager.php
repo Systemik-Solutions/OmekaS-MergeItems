@@ -3,6 +3,7 @@
 namespace MergeItems;
 
 use Doctrine\ORM\EntityManager;
+use Laminas\Log\Logger;
 use Omeka\Api\Manager as ApiManager;
 use Throwable;
 
@@ -10,23 +11,41 @@ class ReferenceManager
 {
     private EntityManager $entityManager;
     private ApiManager $apiManager;
+    private Logger $logger;
 
-    public function __construct(EntityManager $entityManager, ApiManager $apiManager)
-    {
+    public function __construct(
+        EntityManager $entityManager,
+        ApiManager $apiManager,
+        Logger $logger
+    ) {
         $this->entityManager = $entityManager;
         $this->apiManager = $apiManager;
+        $this->logger = $logger;
     }
 
     public function findDisplayReferences(array $targetIds): array
     {
-        $references = array_fill_keys($targetIds, []);
+        $targetIds = array_values(array_unique(array_filter(
+            array_map('intval', $targetIds),
+            static fn (int $id): bool => $id > 0
+        )));
+        $targetLookup = array_fill_keys($targetIds, true);
+        $reports = [];
+        foreach ($targetIds as $targetId) {
+            $reports[$targetId] = $this->newDisplayReport();
+        }
+
         $rows = $this->getIncomingReferenceRows($targetIds);
         $sourceIds = [];
+        $rowsByTargetAndSource = [];
         foreach ($rows as $row) {
+            $targetId = (int) $row['target_id'];
             $sourceId = (int) $row['source_id'];
-            if ($sourceId !== (int) $row['target_id']) {
-                $sourceIds[$sourceId] = true;
+            if ($sourceId === $targetId) {
+                continue;
             }
+            $sourceIds[$sourceId] = true;
+            $rowsByTargetAndSource[$targetId][$sourceId][] = $row;
         }
 
         $sourceResources = [];
@@ -40,31 +59,54 @@ class ReferenceManager
                     $sourceResources[$resource->id()] = $resource;
                 }
             } catch (Throwable $e) {
-                // If the batch cannot be read, render no inaccessible sources.
+                $this->logger->err(sprintf(
+                    'MergeItems could not load incoming reference sources: %s',
+                    $e->getMessage()
+                ), ['exception' => $e]);
+                foreach ($reports as &$report) {
+                    $report['load_error'] = true;
+                }
+                unset($report);
+                return $reports;
             }
         }
 
-        foreach ($rows as $row) {
-            $targetId = (int) $row['target_id'];
-            $sourceId = (int) $row['source_id'];
-            if ($sourceId === $targetId) {
-                continue;
-            }
-            if (!isset($sourceResources[$sourceId])) {
-                continue;
-            }
+        foreach ($rowsByTargetAndSource as $targetId => $sourceRows) {
+            foreach ($sourceRows as $sourceId => $referenceRows) {
+                if (!isset($sourceResources[$sourceId])) {
+                    ++$reports[$targetId]['unreadable_count'];
+                    continue;
+                }
 
-            if (!isset($references[$targetId][$sourceId])) {
-                $references[$targetId][$sourceId] = [
-                    'resource' => $sourceResources[$sourceId],
+                $resource = $sourceResources[$sourceId];
+                $requiresUpdate = !isset($targetLookup[$sourceId]);
+                $canUpdate = !$requiresUpdate || $resource->userIsAllowed('update');
+                if (!$canUpdate) {
+                    ++$reports[$targetId]['non_updatable_count'];
+                }
+                $reports[$targetId]['resources'][$sourceId] = [
+                    'resource' => $resource,
                     'properties' => [],
+                    'can_update' => $canUpdate,
                 ];
+                foreach ($referenceRows as $row) {
+                    $reports[$targetId]['resources'][$sourceId]['properties'][(int) $row['property_id']]
+                        = $row['property_label'];
+                }
             }
-            $references[$targetId][$sourceId]['properties'][(int) $row['property_id']]
-                = $row['property_label'];
         }
 
-        return $references;
+        return $reports;
+    }
+
+    private function newDisplayReport(): array
+    {
+        return [
+            'resources' => [],
+            'unreadable_count' => 0,
+            'non_updatable_count' => 0,
+            'load_error' => false,
+        ];
     }
 
     public function buildRewirePlan(int $masterId, array $duplicateIds): array

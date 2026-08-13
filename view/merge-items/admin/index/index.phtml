@@ -87,7 +87,7 @@ $itemCount = count($items);
                         </div>
 
                         <?= $this->partial('merge-items/admin/common/references', [
-                            'references' => $incomingReferences[$item->id()] ?? [],
+                            'referenceReport' => $incomingReferences[$item->id()] ?? [],
                         ]) ?>
 
                         <div class="merge-items-record-values">
