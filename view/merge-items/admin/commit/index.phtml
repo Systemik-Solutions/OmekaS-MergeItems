@@ -159,12 +159,18 @@ $this->htmlElement('body')->appendAttribute('class', 'merge-items merge-items-co
                                         <strong><?= $escape($propertyLabel) ?></strong>
                                     </label>
                                     <div class="merge-items-field-values">
-                                        <?php foreach ($propertyData['values'] as $value): ?>
-                                        <div class="merge-items-field-value">
+                                        <?php foreach ($propertyData['values'] as $valueIndex => $value): ?>
+                                        <?php $valueStatus = $propertyData['value_statuses'][$valueIndex] ?? 'new'; ?>
+                                        <div class="merge-items-field-value merge-items-field-value-<?= $valueStatus ?>">
                                             <?= $value->asHtml() ?>
                                             <?php if (!$value->isPublic()): ?>
                                             <span class="o-icon-private" role="img" title="<?= $this->escapeHtmlAttr($translate('Private')) ?>" aria-label="<?= $this->escapeHtmlAttr($translate('Private')) ?>"></span>
                                             <?php endif; ?>
+                                            <span class="merge-items-value-status">
+                                                <?= $valueStatus === 'existing'
+                                                    ? $translate('Already in master')
+                                                    : $translate('New value') ?>
+                                            </span>
                                         </div>
                                         <?php endforeach; ?>
                                     </div>

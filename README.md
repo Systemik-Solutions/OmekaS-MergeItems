@@ -47,6 +47,8 @@ After installing the files, sign in to the Omeka S admin interface, open
 - All available property and media groups are selected by default except the
   master's configured title property 
 - Selecting a property appends all values for that property to the master.
+- Exact values already present on the master are not appended again. Values
+  selected from multiple duplicate records are also added only once.
 - Selecting a media group moves all media from that duplicate to the master.
 - The master record keeps its resource template, resource class, visibility,
   item sets, site assignments, and other item-level settings.

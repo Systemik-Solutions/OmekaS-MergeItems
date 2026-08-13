@@ -170,8 +170,13 @@ class CommitController extends AbstractActionController
         }
 
         $masterPropertyIds = [];
+        $masterValueKeys = [];
         foreach ($master->values() as $propertyData) {
-            $masterPropertyIds[$propertyData['property']->id()] = true;
+            $propertyId = $propertyData['property']->id();
+            $masterPropertyIds[$propertyId] = true;
+            foreach ($propertyData['values'] as $value) {
+                $masterValueKeys[$propertyId][$this->valueEqualityKey($value)] = true;
+            }
         }
 
         $titlePropertyId = $this->getTitlePropertyId($master);
@@ -183,6 +188,19 @@ class CommitController extends AbstractActionController
                 $propertyId = $propertyData['property']->id();
                 if (isset($masterPropertyIds[$propertyId])) {
                     $propertyData['term'] = $term;
+                    $propertyData['value_statuses'] = [];
+                    $propertyData['new_value_count'] = 0;
+                    foreach ($propertyData['values'] as $value) {
+                        $isNew = !isset(
+                            $masterValueKeys[$propertyId][$this->valueEqualityKey($value)]
+                        );
+                        $propertyData['value_statuses'][] = $isNew
+                            ? 'new'
+                            : 'existing';
+                        if ($isNew) {
+                            ++$propertyData['new_value_count'];
+                        }
+                    }
                     $mergeableValues[$duplicateId][$propertyId] = $propertyData;
                 }
             }
@@ -208,34 +226,15 @@ class CommitController extends AbstractActionController
         $masterId = $master->id();
         $masterIsPublic = $master->isPublic();
         $duplicateIds = array_keys($duplicates);
-        $selectedItemLookup = array_fill_keys(
-            array_merge([$masterId], $duplicateIds),
-            true
+        $valuePayload = $this->buildValuePayload(
+            $master,
+            $duplicates,
+            $mergeableValues,
+            $selectedValues
         );
-        $valuePayload = [];
         $mediaIds = [];
 
         foreach ($duplicates as $duplicateId => $duplicate) {
-            foreach ($selectedValues[$duplicateId] ?? [] as $propertyId) {
-                if (!isset($mergeableValues[$duplicateId][$propertyId])) {
-                    continue;
-                }
-                $propertyData = $mergeableValues[$duplicateId][$propertyId];
-                $term = $propertyData['term'];
-                foreach ($propertyData['values'] as $value) {
-                    $valueData = $value->jsonSerialize();
-                    $valueResourceId = isset($valueData['value_resource_id'])
-                        ? (int) $valueData['value_resource_id']
-                        : 0;
-                    if ($valueResourceId && isset($selectedItemLookup[$valueResourceId])) {
-                        // Every selected item resolves to the master. Do not
-                        // append a value that would point the master to itself.
-                        continue;
-                    }
-                    $valuePayload[$term][] = $valueData;
-                }
-            }
-
             if (!isset($selectedMedia[$duplicateId])) {
                 continue;
             }
@@ -364,12 +363,84 @@ class CommitController extends AbstractActionController
     {
         $selected = [];
         foreach ($mergeableValues as $duplicateId => $properties) {
-            $selected[$duplicateId] = array_values(array_filter(
-                array_keys($properties),
-                static fn (int $propertyId): bool => $propertyId !== $titlePropertyId
-            ));
+            $selected[$duplicateId] = [];
+            foreach ($properties as $propertyId => $propertyData) {
+                if ($propertyId !== $titlePropertyId
+                    && !empty($propertyData['new_value_count'])
+                ) {
+                    $selected[$duplicateId][] = $propertyId;
+                }
+            }
         }
         return $selected;
+    }
+
+    private function buildValuePayload(
+        ItemRepresentation $master,
+        array $duplicates,
+        array $mergeableValues,
+        array $selectedValues
+    ): array {
+        $selectedItemLookup = array_fill_keys(
+            array_merge([$master->id()], array_keys($duplicates)),
+            true
+        );
+        $seenValueKeys = [];
+        foreach ($master->values() as $propertyData) {
+            $propertyId = $propertyData['property']->id();
+            foreach ($propertyData['values'] as $value) {
+                $seenValueKeys[$propertyId][$this->valueEqualityKey($value)] = true;
+            }
+        }
+
+        $valuePayload = [];
+        foreach ($duplicates as $duplicateId => $duplicate) {
+            foreach ($selectedValues[$duplicateId] ?? [] as $propertyId) {
+                if (!isset($mergeableValues[$duplicateId][$propertyId])) {
+                    continue;
+                }
+                $propertyData = $mergeableValues[$duplicateId][$propertyId];
+                $term = $propertyData['term'];
+                foreach ($propertyData['values'] as $value) {
+                    $valueData = $value->jsonSerialize();
+                    $valueResourceId = isset($valueData['value_resource_id'])
+                        ? (int) $valueData['value_resource_id']
+                        : 0;
+                    if ($valueResourceId && isset($selectedItemLookup[$valueResourceId])) {
+                        // Every selected item resolves to the master. Do not
+                        // append a value that would point the master to itself.
+                        continue;
+                    }
+
+                    $valueKey = $this->valueEqualityKey($value);
+                    if (isset($seenValueKeys[$propertyId][$valueKey])) {
+                        continue;
+                    }
+                    $seenValueKeys[$propertyId][$valueKey] = true;
+                    $valuePayload[$term][] = $valueData;
+                }
+            }
+        }
+
+        return $valuePayload;
+    }
+
+    private function valueEqualityKey($value): string
+    {
+        $valueResource = $value->valueResource();
+        if ($valueResource) {
+            $payload = ['resource', $valueResource->id()];
+        } elseif ($value->uri() !== null) {
+            $payload = ['uri', $value->uri()];
+        } else {
+            $payload = ['value', $value->value()];
+        }
+
+        return json_encode([
+            $value->type(),
+            $payload,
+            $value->lang() ?? '',
+        ], JSON_THROW_ON_ERROR);
     }
 
     private function getTitlePropertyId(ItemRepresentation $master): ?int
