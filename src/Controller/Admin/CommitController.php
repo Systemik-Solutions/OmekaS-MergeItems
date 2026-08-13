@@ -282,12 +282,33 @@ class CommitController extends AbstractActionController
         $connection = $this->entityManager->getConnection();
         $connection->beginTransaction();
         try {
-            $position = count($master->media()) + 1;
+            $position = (int) $connection->executeQuery(
+                'SELECT COALESCE(MAX(position), 0) FROM media WHERE item_id = ?',
+                [$masterId]
+            )->fetchOne() + 1;
+            $mediaPositions = [];
             foreach ($mediaIds as $mediaId) {
+                $mediaPositions[$mediaId] = $position++;
                 $connection->update('media', [
                     'item_id' => $masterId,
-                    'position' => $position++,
+                    'position' => $mediaPositions[$mediaId],
                 ], ['id' => $mediaId]);
+            }
+
+            if ($mediaIds) {
+                // MediaAdapter does not hydrate o:item on UPDATE, so ownership
+                // must be changed directly. Reload the moved media, then pass
+                // each one through the API to dispatch the standard update
+                // events and refresh media-level derived state.
+                $this->entityManager->clear();
+                foreach ($mediaIds as $mediaId) {
+                    $this->apiManager->update('media', $mediaId, [
+                        'o:item' => ['o:id' => $masterId],
+                        'position' => $mediaPositions[$mediaId],
+                    ], [], [
+                        'isPartial' => true,
+                    ]);
+                }
             }
 
             $this->referenceManager->applyRewirePlan($rewirePlan, $masterId);
