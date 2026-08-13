@@ -54,6 +54,10 @@ After installing the files, sign in to the Omeka S admin interface, open
   and value annotations—to a duplicate are changed to point to the master
   record before the duplicate is deleted. These referrers are listed in the
   References panel before the merge.
+- The References panel reports sources that cannot be viewed or updated with
+  the current account. It also reports reference-loading errors instead of
+  presenting them as an empty reference list. A merge cannot proceed unless
+  every surviving referencing resource can be updated.
 - Every non-master item is permanently deleted when the merge is committed.
 - Media that is not selected is deleted along with its duplicate item.
 

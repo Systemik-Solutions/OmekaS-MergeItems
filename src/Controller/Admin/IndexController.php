@@ -2,17 +2,21 @@
 
 namespace MergeItems\Controller\Admin;
 
+use Laminas\Log\Logger;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use MergeItems\ReferenceManager;
+use Throwable;
 
 class IndexController extends AbstractActionController
 {
     private ReferenceManager $referenceManager;
+    private Logger $logger;
 
-    public function __construct(ReferenceManager $referenceManager)
+    public function __construct(ReferenceManager $referenceManager, Logger $logger)
     {
         $this->referenceManager = $referenceManager;
+        $this->logger = $logger;
     }
 
     public function indexAction()
@@ -40,17 +44,26 @@ class IndexController extends AbstractActionController
             $masterId = null;
         }
 
-        $items = [];
-        foreach ($resourceIds as $resourceId) {
-            $items[] = $this->api()->read('items', $resourceId)->getContent();
+        try {
+            $items = [];
+            foreach ($resourceIds as $resourceId) {
+                $items[] = $this->api()->read('items', $resourceId)->getContent();
+            }
+            $incomingReferences = $this->referenceManager
+                ->findDisplayReferences($resourceIds);
+        } catch (Throwable $e) {
+            $this->logger->err((string) $e);
+            $this->messenger()->addError(
+                'The selected items could not be loaded. One or more items may have been deleted or may not be available to you.' // @translate
+            );
+            return $this->redirectToItems($returnQuery);
         }
 
         $view = new ViewModel([
             'items' => $items,
             'returnQuery' => $returnQuery,
             'masterId' => $masterId,
-            'incomingReferences' => $this->referenceManager
-                ->findDisplayReferences($resourceIds),
+            'incomingReferences' => $incomingReferences,
         ]);
         $view->setTemplate('merge-items/admin/index/index');
         return $view;
