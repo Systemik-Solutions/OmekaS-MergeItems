@@ -9,8 +9,10 @@ $resourceTypeLabels = [
 ];
 $references = $referenceReport['resources'] ?? [];
 $unreadableCount = (int) ($referenceReport['unreadable_count'] ?? 0);
+$nonBlockingUnreadableCount = (int) ($referenceReport['non_blocking_unreadable_count'] ?? 0);
 $nonUpdatableCount = (int) ($referenceReport['non_updatable_count'] ?? 0);
 $loadError = !empty($referenceReport['load_error']);
+$warningsConditional = !empty($referenceReport['warnings_conditional']);
 ?>
 
 <section class="merge-items-references" aria-label="<?= $this->escapeHtmlAttr($translate('References')) ?>">
@@ -51,29 +53,53 @@ $loadError = !empty($referenceReport['load_error']);
             <?php endif; ?>
             <?php if (!$reference['can_update']): ?>
             <span class="merge-items-reference-permission-warning">
-                <?= $translate('You do not have permission to update this resource.') ?>
+                <?= $warningsConditional
+                    ? $translate('You do not have permission to update this resource. It may need to be updated depending on which master is selected.')
+                    : $translate('You do not have permission to update this resource.') ?>
             </span>
             <?php endif; ?>
         </li>
         <?php endforeach; ?>
     </ul>
-    <?php elseif (!$unreadableCount): ?>
+    <?php elseif (!$unreadableCount && !$nonBlockingUnreadableCount): ?>
     <p><?= $translate('No other resources reference this item.') ?></p>
     <?php endif; ?>
     <?php if ($unreadableCount): ?>
     <p class="merge-items-reference-warning">
+        <?php if ($warningsConditional): ?>
+            <?= sprintf(
+                $translate('%s additional referencing resources cannot be viewed. Depending on which master is selected, they may need to be updated and may prevent the merge.'),
+                $unreadableCount
+            ) ?>
+        <?php else: ?>
+            <?= sprintf(
+                $translate('%s additional referencing resources cannot be viewed. The merge cannot proceed unless every resource that must be rewired can be updated.'),
+                $unreadableCount
+            ) ?>
+        <?php endif; ?>
+    </p>
+    <?php endif; ?>
+    <?php if ($nonBlockingUnreadableCount): ?>
+    <p>
         <?= sprintf(
-            $translate('%s additional referencing resources cannot be viewed. The merge cannot proceed unless every referencing resource can be updated.'),
-            $unreadableCount
+            $translate('%s additional referencing resources cannot be viewed, but they do not need to be updated for this merge.'),
+            $nonBlockingUnreadableCount
         ) ?>
     </p>
     <?php endif; ?>
     <?php if ($nonUpdatableCount): ?>
     <p class="merge-items-reference-warning">
-        <?= sprintf(
-            $translate('%s visible referencing resources cannot be updated with your current permissions. The merge will not proceed.'),
-            $nonUpdatableCount
-        ) ?>
+        <?php if ($warningsConditional): ?>
+            <?= sprintf(
+                $translate('%s visible referencing resources cannot be updated with your current permissions. Depending on which master is selected, they may prevent the merge.'),
+                $nonUpdatableCount
+            ) ?>
+        <?php else: ?>
+            <?= sprintf(
+                $translate('%s visible referencing resources cannot be updated with your current permissions. The merge will not proceed.'),
+                $nonUpdatableCount
+            ) ?>
+        <?php endif; ?>
     </p>
     <?php endif; ?>
     <?php endif; ?>

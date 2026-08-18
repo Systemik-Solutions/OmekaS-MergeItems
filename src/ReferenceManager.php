@@ -24,16 +24,22 @@ class ReferenceManager
         $this->logger = $logger;
     }
 
-    public function findDisplayReferences(array $targetIds): array
+    public function findDisplayReferences(
+        array $targetIds,
+        ?int $masterId = null
+    ): array
     {
         $targetIds = array_values(array_unique(array_filter(
             array_map('intval', $targetIds),
             static fn (int $id): bool => $id > 0
         )));
         $targetLookup = array_fill_keys($targetIds, true);
+        if ($masterId !== null && !isset($targetLookup[$masterId])) {
+            $masterId = null;
+        }
         $reports = [];
         foreach ($targetIds as $targetId) {
-            $reports[$targetId] = $this->newDisplayReport();
+            $reports[$targetId] = $this->newDisplayReport($masterId === null);
         }
 
         $rows = $this->getIncomingReferenceRows($targetIds);
@@ -74,13 +80,18 @@ class ReferenceManager
 
         foreach ($rowsByTargetAndSource as $targetId => $sourceRows) {
             foreach ($sourceRows as $sourceId => $referenceRows) {
+                $requiresUpdate = !isset($targetLookup[$sourceId])
+                    && ($masterId === null || $targetId !== $masterId);
                 if (!isset($sourceResources[$sourceId])) {
-                    ++$reports[$targetId]['unreadable_count'];
+                    if ($requiresUpdate) {
+                        ++$reports[$targetId]['unreadable_count'];
+                    } else {
+                        ++$reports[$targetId]['non_blocking_unreadable_count'];
+                    }
                     continue;
                 }
 
                 $resource = $sourceResources[$sourceId];
-                $requiresUpdate = !isset($targetLookup[$sourceId]);
                 $canUpdate = !$requiresUpdate || $resource->userIsAllowed('update');
                 if (!$canUpdate) {
                     ++$reports[$targetId]['non_updatable_count'];
@@ -88,6 +99,7 @@ class ReferenceManager
                 $reports[$targetId]['resources'][$sourceId] = [
                     'resource' => $resource,
                     'properties' => [],
+                    'requires_update' => $requiresUpdate,
                     'can_update' => $canUpdate,
                 ];
                 foreach ($referenceRows as $row) {
@@ -100,13 +112,15 @@ class ReferenceManager
         return $reports;
     }
 
-    private function newDisplayReport(): array
+    private function newDisplayReport(bool $warningsConditional): array
     {
         return [
             'resources' => [],
             'unreadable_count' => 0,
+            'non_blocking_unreadable_count' => 0,
             'non_updatable_count' => 0,
             'load_error' => false,
+            'warnings_conditional' => $warningsConditional,
         ];
     }
 

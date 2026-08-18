@@ -212,7 +212,7 @@ class CommitController extends AbstractActionController
             'mergeableValues' => $mergeableValues,
             'titlePropertyId' => $titlePropertyId,
             'incomingReferences' => $this->referenceManager
-                ->findDisplayReferences($resourceIds),
+                ->findDisplayReferences($resourceIds, $masterId),
         ];
     }
 
