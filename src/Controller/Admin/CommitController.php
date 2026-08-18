@@ -262,6 +262,12 @@ class CommitController extends AbstractActionController
                     $sourceId
                 ));
             }
+            if ($source->resourceName() === 'value_annotations') {
+                // Value annotations can be authorized through the generic
+                // resources adapter, but they have no standalone update API.
+                // The rewired value needs no independent index refresh.
+                continue;
+            }
             $affectedSources[$sourceId] = [
                 'resource_name' => $source->resourceName(),
                 'is_public' => $source->isPublic(),
@@ -270,7 +276,7 @@ class CommitController extends AbstractActionController
 
         foreach ($rewirePlan['annotation_ids'] as $annotationId) {
             $annotation = $this->apiManager
-                ->read('value_annotations', $annotationId)->getContent();
+                ->read('resources', $annotationId)->getContent();
             if (!$annotation->userIsAllowed('delete')) {
                 throw new \RuntimeException(sprintf(
                     'The current user cannot delete value annotation %d.',
@@ -317,9 +323,9 @@ class CommitController extends AbstractActionController
             // outside the ORM.
             $this->entityManager->clear();
 
-            foreach ($rewirePlan['annotation_ids'] as $annotationId) {
-                $this->apiManager->delete('value_annotations', $annotationId);
-            }
+            $this->referenceManager->removeValueAnnotations(
+                $rewirePlan['annotation_ids']
+            );
 
             // Always update the master so its modified date and full-text index
             // reflect moved media and removed self-references even when no

@@ -5,6 +5,7 @@ namespace MergeItems;
 use Doctrine\ORM\EntityManager;
 use Laminas\Log\Logger;
 use Omeka\Api\Manager as ApiManager;
+use Omeka\Entity\ValueAnnotation;
 use Throwable;
 
 class ReferenceManager
@@ -166,6 +167,25 @@ class ReferenceManager
         }
         foreach ($plan['deletes'] as $valueId) {
             $connection->delete('value', ['id' => $valueId]);
+        }
+    }
+
+    public function removeValueAnnotations(array $annotationIds): void
+    {
+        foreach (array_unique(array_map('intval', $annotationIds)) as $annotationId) {
+            if ($annotationId < 1) {
+                continue;
+            }
+            $annotation = $this->entityManager->find(
+                ValueAnnotation::class,
+                $annotationId
+            );
+            if ($annotation) {
+                // Value annotations deliberately have no standalone delete
+                // API operation. Removing the entity also removes its values
+                // (and any nested annotations) through Doctrine's cascades.
+                $this->entityManager->remove($annotation);
+            }
         }
     }
 
