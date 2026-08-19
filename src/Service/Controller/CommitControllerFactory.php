@@ -12,6 +12,7 @@ class CommitControllerFactory implements FactoryInterface
     {
         return new CommitController(
             $services->get('Omeka\ApiManager'),
+            $services->get('Omeka\Acl'),
             $services->get('Omeka\EntityManager'),
             $services->get('FormElementManager'),
             $services->get('Omeka\Logger'),

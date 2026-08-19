@@ -186,6 +186,7 @@ class ReferenceManager
 
     public function removeValueAnnotations(array $annotationIds): void
     {
+        $hasRemovals = false;
         foreach (array_unique(array_map('intval', $annotationIds)) as $annotationId) {
             if ($annotationId < 1) {
                 continue;
@@ -199,7 +200,12 @@ class ReferenceManager
                 // API operation. Removing the entity also removes its values
                 // (and any nested annotations) through Doctrine's cascades.
                 $this->entityManager->remove($annotation);
+                $hasRemovals = true;
             }
+        }
+        if ($hasRemovals) {
+            // Do not rely on a later API update to flush these removals.
+            $this->entityManager->flush();
         }
     }
 

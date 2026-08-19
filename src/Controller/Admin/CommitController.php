@@ -12,11 +12,15 @@ use MergeItems\Form\MergeCommitForm;
 use MergeItems\ReferenceManager;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\ItemRepresentation;
+use Omeka\Entity\Resource;
+use Omeka\Entity\ValueAnnotation;
+use Omeka\Permissions\Acl;
 use Throwable;
 
 class CommitController extends AbstractActionController
 {
     private ApiManager $apiManager;
+    private Acl $acl;
     private EntityManager $entityManager;
     private FormElementManager $formElementManager;
     private Logger $logger;
@@ -24,12 +28,14 @@ class CommitController extends AbstractActionController
 
     public function __construct(
         ApiManager $apiManager,
+        Acl $acl,
         EntityManager $entityManager,
         FormElementManager $formElementManager,
         Logger $logger,
         ReferenceManager $referenceManager
     ) {
         $this->apiManager = $apiManager;
+        $this->acl = $acl;
         $this->entityManager = $entityManager;
         $this->formElementManager = $formElementManager;
         $this->logger = $logger;
@@ -255,29 +261,48 @@ class CommitController extends AbstractActionController
         );
         $affectedSources = [];
         foreach ($rewirePlan['affected_source_ids'] as $sourceId) {
-            $source = $this->apiManager->read('resources', $sourceId)->getContent();
-            if (!$source->userIsAllowed('update')) {
+            // Do not read the source through the API. ValueAnnotation has no
+            // read ACL rule, even for roles that may update it, so an API read
+            // would make annotation referrers impossible to merge.
+            $source = $this->entityManager->find(Resource::class, $sourceId);
+            if (!$source) {
+                throw new \RuntimeException(sprintf(
+                    'Referencing resource %d no longer exists.',
+                    $sourceId
+                ));
+            }
+            if (!$this->acl->userIsAllowed($source, 'update')) {
                 throw new \RuntimeException(sprintf(
                     'The current user cannot update referencing resource %d.',
                     $sourceId
                 ));
             }
-            if ($source->resourceName() === 'value_annotations') {
-                // Value annotations can be authorized through the generic
-                // resources adapter, but they have no standalone update API.
+            if ($source instanceof ValueAnnotation) {
+                // Value annotations have no standalone update API operation.
                 // The rewired value needs no independent index refresh.
                 continue;
             }
             $affectedSources[$sourceId] = [
-                'resource_name' => $source->resourceName(),
+                'resource_name' => $source->getResourceName(),
                 'is_public' => $source->isPublic(),
             ];
         }
 
         foreach ($rewirePlan['annotation_ids'] as $annotationId) {
-            $annotation = $this->apiManager
-                ->read('resources', $annotationId)->getContent();
-            if (!$annotation->userIsAllowed('delete')) {
+            $annotation = $this->entityManager->find(
+                ValueAnnotation::class,
+                $annotationId
+            );
+            if (!$annotation) {
+                continue;
+            }
+            // The annotation is nested on a value being removed from the
+            // editable master item. Core treats this as a parent update, so
+            // accept update permission too (reviewers do not have a separate
+            // ValueAnnotation delete grant).
+            if (!$this->acl->userIsAllowed($annotation, 'delete')
+                && !$this->acl->userIsAllowed($annotation, 'update')
+            ) {
                 throw new \RuntimeException(sprintf(
                     'The current user cannot delete value annotation %d.',
                     $annotationId
